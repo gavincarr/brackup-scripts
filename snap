@@ -52,6 +52,9 @@ if ($mount_dev =~ m! ^/dev/mapper/([^/]+)$ !x) {
   die "Error: cannot split mapped VG/LV element '$vg_lv' in two on hyphens\n"
     if @elt != 2;
   ($vg, $lv) = @elt;
+  # Reduce multiple hyphens (?)
+  $vg =~ s/--+/-/g;
+  $lv =~ s/--+/-/g;
 }
 elsif ($mount_dev =~ m! ^/dev/([^/]+)/([^/]+)$ !x) {
   $vg = $1;
