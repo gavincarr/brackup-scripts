@@ -10,6 +10,7 @@ use File::Basename;
 use Config::Tiny;
 use DateTime;
 use LWP::UserAgent;
+use HTTP::Request::Common;
 
 sub usage {
   die "usage: " . basename($0) . " [-v] [-n] [-t <target>] [-d <run_dir>] [--monthly] [-u <murl>] [--snapshot] <source> [<source2>...]\n";
