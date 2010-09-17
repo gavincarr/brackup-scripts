@@ -8,20 +8,18 @@ use File::Basename;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use IPC::Run qw(run);
 
-# Snapshot size
+# Defaults
 my $size = '250G';
 
 my $me = basename($0);
 sub usage {
-  die "usage: $me [-v] [-n] [-l <logical_volume>] [-g <volume_group>] [-s <snapshot_mountpoint] [-S <snapshot_size>] <partition>\n";
+  die "usage: $me [-v] [-n] [-S <snapshot_size>] [-s <snapshot_mountpoint] <mountpoint>\n";
 }
 
-my ($help, $lv, $vg, $snap, $noop, $verbose);
+my ($help, $lv, $vg, $snap_mp, $noop, $verbose);
 usage unless GetOptions(
   'help|h|?'        => \$help,
-  'lv|l=s'          => \$lv,
-  'vg|g=s'          => \$vg,
-  'snap|s=s'        => \$snap,
+  'snap|s=s'        => \$snap_mp,
   'noop|n'          => \$noop,
   'size|S=s'        => \$size,
   'verbose|v'       => \$verbose,
@@ -29,45 +27,53 @@ usage unless GetOptions(
 usage if $help;
 usage unless @ARGV == 1;
 
-my $part = shift @ARGV;
+my $mp = shift @ARGV;
+$mp = "/$mp" unless substr($mp,0,1) eq '/';
+$snap_mp ||= $mp . '_snap';
 
-unless ($lv) {
-  $lv = $part;
-  $lv =~ s{/}{}g;
+# Derive $lv and $vg from mountpoint
+# Quick and dirty 'mount(1)' hacking - should really be/use a CPAN module
+my ($vg, $lv);
+my @mount = split /\n/, qx(mount);
+pop @mount;
+die "Error: cannot get mounted filesystems\n" unless @mount;
+
+my @mount_entry = grep { my @elt = split /\s+/, $_; ($elt[2]||'') eq $mp } @mount
+  or die "Error: cannot find mount entry for mountpoint $mp\n";
+@mount_entry == 1
+  or die "Error: found multiple mountpoints for mountpoint '$mp'\n";
+my $mount_entry = shift @mount_entry;
+
+my $mount_dev = (split /\s+/, $mount_entry)[0]
+  or die "Error: cannot find mount device in mount entry '$mount_entry'\n";
+if ($mount_dev =~ m! ^/dev/mapper/([^/]+)$ !x) {
+  my $vg_lv = $1;
+  my @elt = split m/ (?<!-) - (?!-) /x, $vg_lv;
+  die "Error: cannot split mapped VG/LV element '$vg_lv' in two on hyphens\n"
+    if @elt != 2;
+  ($vg, $lv) = @elt;
+}
+elsif ($mount_dev =~ m! ^/dev/([^/]+)/([^/]+)$ !x) {
+  $vg = $1;
+  $lv = $2;
+}
+else {
+  die "Error: cannot derive VG and/or LV from device '$mount_dev'\n";
 }
 
-$part = "/$part" unless substr($part,0,1) eq '/';
-
-unless ($snap) {
-  $snap = $part . '_snap';
-}
-
-# Derive volume group
-unless ($vg) {
-  my $lv_list;
-
-  run([ 'lvs' ], '>&', \$lv_list);
-  die "Error: cannot find logical volumes, aborting\n" unless $lv_list;
-
-  if ($lv_list =~ m{ ^ \s* $lv \s+ (\w+) \s+ }msx) {
-    $vg = $1;
-  }
-  else {
-    die "Error: cannot find logical volume '$lv'\n";
-  }
-}
-
+my $lv_snap = $lv . '_snap';
 my $dev = "/dev/$vg/$lv";
-my $dev_snap = $dev . '_snap';
+my $dev_snap = "/dev/$vg/$lv_snap";
 
 if ($verbose || $noop) {
-  print "+ part: $part\n";
-  print "+ snap: $snap\n";
-  print "+ lv: $lv\n";
+  print "+ mp $mp\n";
+  print "+ snap_mp: $snap_mp\n";
   print "+ vg: $vg\n";
-  print "+ size: $size\n";
+  print "+ lv: $lv\n";
+  print "+ lv_snap: $lv_snap\n";
   print "+ dev: $dev\n";
   print "+ dev_snap: $dev_snap\n";
+  print "+ size: $size\n";
 }
 
 my $run = sub {
@@ -85,13 +91,13 @@ my $run = sub {
 if ($me eq 'snap') {
 
   # Create snapshot
-  $run->("lvcreate -L$size --snapshot --permission r -n $snap $dev");
+  $run->("lvcreate -L$size --snapshot --permission r -n $lv_snap $dev");
 
   # Mount snapshot
-  $run->("mount -o ro $dev_snap $snap");
+  $run->("mount -o ro $dev_snap $snap_mp");
 
   # Report
-  print "Snapshot mounted at $snap\n" unless $noop;
+  print "Snapshot mounted at $snap_mp\n" unless $noop;
 }
 
 # Unsnap mode
@@ -99,15 +105,15 @@ elsif ($me eq 'unsnap') {
   # Unmount if mounted
   my $mount_list;
   run([ 'mount' ], '>&', \$mount_list);
-  if ($mount_list =~ m{ on $snap\b}ms) {
-    $run->("umount -f $snap");
+  if ($mount_list =~ m{ on $snap_mp\b}ms) {
+    $run->("umount -f $snap_mp");
   }
 
   # Remove snapshot
   $run->("lvremove -f $dev_snap");
 
   # Report
-  print "Snapshot $snap removed\n" unless $noop;
+  print "Snapshot $snap_mp removed\n" unless $noop;
 }
 
 else {
