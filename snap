@@ -1,0 +1,116 @@
+#!/usr/bin/perl
+#
+# Script to create LVM snapshots quickly and easily
+#
+
+use strict;
+use File::Basename;
+use Getopt::Long qw(:config no_ignore_case bundling);
+use IPC::Run qw(run);
+
+# Snapshot size
+my $size = '250G';
+
+my $me = basename($0);
+sub usage {
+  die "usage: $me [-v] [-n] [-l <logical_volume>] [-g <volume_group>] [-s <snapshot_mountpoint] [-S <snapshot_size>] <partition>\n";
+}
+
+my ($help, $lv, $vg, $snap, $noop, $verbose);
+usage unless GetOptions(
+  'help|h|?'        => \$help,
+  'lv|l=s'          => \$lv,
+  'vg|g=s'          => \$vg,
+  'snap|s=s'        => \$snap,
+  'noop|n'          => \$noop,
+  'size|S=s'        => \$size,
+  'verbose|v'       => \$verbose,
+);
+usage if $help;
+usage unless @ARGV == 1;
+
+my $part = shift @ARGV;
+
+unless ($lv) {
+  $lv = $part;
+  $lv =~ s{/}{}g;
+}
+
+$part = "/$part" unless substr($part,0,1) eq '/';
+
+unless ($snap) {
+  $snap = $part . '_snap';
+}
+
+# Derive volume group
+unless ($vg) {
+  my $lv_list;
+
+  run([ 'lvs' ], '>&', \$lv_list);
+  die "Error: cannot find logical volumes, aborting\n" unless $lv_list;
+
+  if ($lv_list =~ m{ ^ \s* $lv \s+ (\w+) \s+ }msx) {
+    $vg = $1;
+  }
+  else {
+    die "Error: cannot find logical volume '$lv'\n";
+  }
+}
+
+my $dev = "/dev/$vg/$lv";
+my $dev_snap = $dev . '_snap';
+
+if ($verbose || $noop) {
+  print "+ part: $part\n";
+  print "+ snap: $snap\n";
+  print "+ lv: $lv\n";
+  print "+ vg: $vg\n";
+  print "+ size: $size\n";
+  print "+ dev: $dev\n";
+  print "+ dev_snap: $dev_snap\n";
+}
+
+my $run = sub {
+  my $cmd = shift;
+
+  print "+ $cmd\n" if $verbose || $noop;
+  return if $noop;
+
+  my @cmd = split /\s+/, $cmd;
+  run(\@cmd, \undef)
+    or die "'$cmd' failed, returning $!\n";
+};
+
+# Snap mode
+if ($me eq 'snap') {
+
+  # Create snapshot
+  $run->("lvcreate -L$size --snapshot --permission r -n $snap $dev");
+
+  # Mount snapshot
+  $run->("mount -o ro $dev_snap $snap");
+
+  # Report
+  print "Snapshot mounted at $snap\n" unless $noop;
+}
+
+# Unsnap mode
+elsif ($me eq 'unsnap') {
+  # Unmount if mounted
+  my $mount_list;
+  run([ 'mount' ], '>&', \$mount_list);
+  if ($mount_list =~ m{ on $snap\b}ms) {
+    $run->("umount -f $snap");
+  }
+
+  # Remove snapshot
+  $run->("lvremove -f $dev_snap");
+
+  # Report
+  print "Snapshot $snap removed\n" unless $noop;
+}
+
+else {
+  die "Unknown snap mode '$me'\n";
+}
+

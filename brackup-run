@@ -1,0 +1,56 @@
+#!/usr/bin/perl
+#
+# Brackup wrapper script, supporting (optionally) snapshots, monthly backups,
+# and pre- and post-run scripts.
+#
+
+use strict;
+use Getopt::Long qw(:config no_ignore_case bundling);
+use File::Basename;
+use DateTime;
+use LWP::UserAgent;
+
+sub usage {
+  die "usage: " . basename($0) . " <source> [<source2>...]\n";
+}
+
+my $run_dir = '/root/brackup';
+my ($help, $noop, $verbose, $monthly, $snapshot);
+usage unless GetOptions(
+  'help|h|?'        => \$verbose,
+  'noop|n'          => \$noop,
+  'verbose|v'       => \$verbose,
+  'dir|run-dir|d=s' => \$run_dir,
+  'monthly|m'       => \$monthly,
+  'snapshot|s'      => \$snapshot,
+);
+$verbose = '-v' if $verbose;
+
+usage unless @ARGV;
+
+$< == 0        or die "Must run as root - aborting";
+chdir $run_dir or die "Cannot cd to $run_dir";
+
+my ($ua, $month);
+if ($monthly) {
+  $ua = LWP::UserAgent->new;
+  $month = DateTime->today->strftime('%Y%m');
+}
+
+for my $source (@ARGV) {
+  # Check if we should do a monthly backup
+  my $month_url = "http://172.20.0.152/brackup/month-$source";
+  my $monthly_update = 0;
+  my $resp = $ua->get( $month_url );
+  if (! $resp->is_success || $month > $resp->decoded_content) {
+    $monthly_update++;
+    $source .= '-monthly';
+  }
+
+  system("/usr/bin/brackup --from=$source --to=admin2 --save-stats $verbose");
+  if ($? == 0 && $monthly_update) {
+    $ua->request( PUT($month_url, Content => "$month\n") )
+      or die "PUT to $month_url failed: $!";
+  }
+}
+
