@@ -66,20 +66,21 @@ my $dev = "/dev/$vg/$lv";
 my $dev_snap = "/dev/$vg/$lv_snap";
 
 if ($verbose || $noop) {
-  print "+ mp $mp\n";
-  print "+ snap_mp: $snap_mp\n";
-  print "+ vg: $vg\n";
-  print "+ lv: $lv\n";
-  print "+ lv_snap: $lv_snap\n";
-  print "+ dev: $dev\n";
-  print "+ dev_snap: $dev_snap\n";
-  print "+ size: $size\n";
+  print STDERR "+ [ snap parameters ]\n";
+  print STDERR "+ mp $mp\n";
+  print STDERR "+ snap_mp: $snap_mp\n";
+  print STDERR "+ vg: $vg\n";
+  print STDERR "+ lv: $lv\n";
+  print STDERR "+ lv_snap: $lv_snap\n";
+  print STDERR "+ dev: $dev\n";
+  print STDERR "+ dev_snap: $dev_snap\n";
+  print STDERR "+ size: $size\n";
 }
 
 my $run = sub {
   my $cmd = shift;
 
-  print "+ $cmd\n" if $verbose || $noop;
+  print STDERR "+ cmd: $cmd\n" if $verbose || $noop;
   return if $noop;
 
   my @cmd = split /\s+/, $cmd;
@@ -119,4 +120,6 @@ elsif ($me eq 'unsnap') {
 else {
   die "Unknown snap mode '$me'\n";
 }
+
+print STDERR "+ end snap\n" if $verbose || $noop;
 
