@@ -40,9 +40,9 @@ if ($config) {
   $monthly          = $config->{_}->{monthly}      if ! defined $monthly;
   $snapshot         = $config->{_}->{snapshot}     if ! defined $snapshot;
   $monthly_url      = $config->{_}->{monthly_url}  if ! defined $monthly_url;
-  $target           = $config->{_}->{target}       if ! defined $target;
   die "monthly_url is not set, required in monthly mode\n" 
     if $monthly and ! $monthly_url;
+  $monthly_url =~ s! /$ !!x if $monthly_url;
 }
 
 my ($ua, $month);
@@ -52,16 +52,22 @@ if ($monthly) {
 }
 
 if ($verbose) {
-  printf STDERR "+ target %s\n",        $target || '';
   printf STDERR "+ run_dir: %s\n",      $run_dir;
   printf STDERR "+ snapshot: %s\n",     $snapshot || '';
   printf STDERR "+ monthly: %s\n",      $monthly || '';
   printf STDERR "+ monthly_url: %s\n",  $monthly_url || '';
-  printf STDERR "+ month: %s\n",        $month || '';
+  printf STDERR "+ month: %s\n",        $month || '' if $monthly;
 }
 
 for my $source (@ARGV) {
+  printf STDERR "+ [ starting brackup of source '$source' ]\n" if $verbose;
+
+  $target = $config->{$source}->{target} || $config->{_}->{target} if ! defined $target;
+  die "Required parameter 'target' is not set for source '$source'\n" unless $target;
+  printf STDERR "+ target: %s\n", $target || '' if $verbose;
+
   my $murl = "$monthly_url/month-$source";
+  printf STDERR "+ murl: %s\n", $murl if $verbose;
   my $monthly_update = 0;
   if ($monthly) {
     # Check if we should do a monthly backup
@@ -73,7 +79,7 @@ for my $source (@ARGV) {
   }
 
   # Run brackup
-  my $cmd = "/usr/bin/brackup --from=$source --to=admin2 --save-stats $verbose";
+  my $cmd = "/usr/bin/brackup --from=$source --to=$target --save-stats $verbose";
   print STDERR "+ cmd: $cmd\n" if $verbose;
   unless ($noop) {
     system($cmd);
