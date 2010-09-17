@@ -121,5 +121,5 @@ else {
   die "Unknown snap mode '$me'\n";
 }
 
-print STDERR "+ end snap\n" if $verbose || $noop;
+print STDERR "+ // end snap\n" if $verbose || $noop;
 
