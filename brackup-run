@@ -80,15 +80,16 @@ for my $source (@ARGV) {
   }
 
   # Get snapshot parameters and create snapshot
-  my $snapshot_ok = 1;
+  my $snap;
   if ($snapshot) {
-    my $snap = Snapshot->new($config, $source, $noop, $verbose);
+    $snap = Snapshot->new($config, $source, $noop, $verbose);
     $snap->dump if $verbose;
 
+    # Run $snap_cmd (even in $noop mode)
     my $snap_cmd = $snap->cmd;
     print STDERR "+ snap_cmd: $snap_cmd\n" if $verbose;
     system($snap_cmd);
-    die "snapshot '$snap_cmd' failed - aborting\n" unless $? == 0;
+    die "snap cmd '$snap_cmd' failed - aborting\n" unless $? == 0;
   }
 
   # Run brackup
@@ -109,12 +110,17 @@ for my $source (@ARGV) {
   
   # Unsnap regardless of success for failure
   if ($snapshot) {
+    my $unsnap_cmd = $snap->cmd_unsnap;
+    print STDERR "+ unsnap_cmd: $unsnap_cmd\n" if $verbose;
+    system($unsnap_cmd);
+    warn "Warning: unsnap cmd '$unsnap_cmd' failed\n" unless $? == 0;
   }
 
   exit $rc if $rc;
 }
 
 exit 0;
+
 
 # Snapshot class to isolate snapshot parameter logic
 package Snapshot;
@@ -153,6 +159,12 @@ sub cmd {
   my $self = shift;
   sprintf "%s %s%s%s%s", 
     $self->{snap}, $self->{verbose}, $self->{noop}, $self->{size}, $self->{mountpoint};
+}
+
+sub cmd_unsnap {
+  my $self = shift;
+  sprintf "%s %s%s%s%s", 
+    $self->{unsnap}, $self->{verbose}, $self->{noop}, $self->{mountpoint};
 }
 
 1;
