@@ -30,7 +30,6 @@ usage unless GetOptions(
 usage if $help;
 usage unless @ARGV;
 
-$verbose = '-v' if $verbose;
 $< == 0        or die "Must run as root - aborting";
 chdir $run_dir or die "Cannot cd to $run_dir";
 
@@ -59,6 +58,7 @@ if ($verbose) {
   printf STDERR "+ month: %s\n",        $month || '' if $monthly;
 }
 
+# Iterate over sources
 for my $source (@ARGV) {
   printf STDERR "+ [ starting brackup of source '$source' ]\n" if $verbose;
 
@@ -66,29 +66,96 @@ for my $source (@ARGV) {
   die "Required parameter 'target' is not set for source '$source'\n" unless $target;
   printf STDERR "+ target: %s\n", $target || '' if $verbose;
 
+  # If monthly mode, check if we this backup should be a monthly
   my $murl = "$monthly_url/month-$source";
   printf STDERR "+ murl: %s\n", $murl if $verbose;
   my $monthly_update = 0;
+  my $source_variant = $source;
   if ($monthly) {
-    # Check if we should do a monthly backup
     my $resp = $ua->get( $murl );
-    if (! $resp->is_success || $month > $resp->decoded_content) {
+    if (! $resp->is_success || $month > ($resp->decoded_content||0)) {
       $monthly_update++;
-      $source .= '-monthly';
+      $source_variant .= '-monthly';
     }
   }
 
+  # Get snapshot parameters and create snapshot
+  my $snapshot_ok = 1;
+  if ($snapshot) {
+    my $snap = Snapshot->new($config, $source, $noop, $verbose);
+    $snap->dump if $verbose;
+
+    my $snap_cmd = $snap->cmd;
+    print STDERR "+ snap_cmd: $snap_cmd\n" if $verbose;
+    system($snap_cmd);
+    die "snapshot '$snap_cmd' failed - aborting\n" unless $? == 0;
+  }
+
   # Run brackup
-  my $cmd = "/usr/bin/brackup --from=$source --to=$target --save-stats $verbose";
+  my $vflag = $verbose ? '-v' : '';
+  my $cmd = "/usr/bin/brackup --from=$source_variant --to=$target --save-stats $vflag";
   print STDERR "+ cmd: $cmd\n" if $verbose;
+  my $rc;
   unless ($noop) {
     system($cmd);
+    $rc = $?;
 
     # Update monthly state file if all okay
-    if ($? == 0 && $monthly_update) {
+    if ($rc == 0 && $monthly_update) {
       $ua->request( PUT($murl, Content => "$month\n") )
         or die "PUT to $murl failed: $!";
     }
   }
+  
+  # Unsnap regardless of success for failure
+  if ($snapshot) {
+  }
+
+  exit $rc if $rc;
 }
+
+exit 0;
+
+# Snapshot class to isolate snapshot parameter logic
+package Snapshot;
+
+use File::Basename;
+
+sub new {
+  my ($class, $config, $source, $noop, $verbose) = @_;
+  my $self = bless {}, $class;
+
+  $self->{snap} = dirname($0) . '/snap';
+  -x $self->{snap} or die "Cannot find 'snap' executable: $self->{snap}\n";
+  $self->{unsnap} = dirname($0) . '/unsnap';
+  -x $self->{unsnap} or die "Cannot find 'unsnap' executable: $self->{unsnap}\n";
+
+  $self->{mountpoint} = $config->{$source}->{mountpoint} || "/$source";
+
+  $self->{size} = $config->{$source}->{snapshot_size} || $config->{_}->{snapshot_size};
+  $self->{size} = $self->{size} ? '-S ' . $self->{size} : '';
+  $self->{noop} = $noop ? '-n ' : '';
+  $self->{verbose} = $verbose ? '-v ' : '';
+
+  return $self;
+}
+
+sub dump {
+  my $self = shift;
+
+  printf STDERR "+ snap: $self->{snap}\n";
+  printf STDERR "+ unsnap: $self->{unsnap}\n";
+  printf STDERR "+ mountpoint: $self->{mountpoint}\n";
+  printf STDERR "+ size: $self->{size}\n";
+}
+
+sub cmd {
+  my $self = shift;
+  sprintf "%s %s%s%s%s", 
+    $self->{snap}, $self->{verbose}, $self->{noop}, $self->{size}, $self->{mountpoint};
+}
+
+1;
+
+__END__
 
