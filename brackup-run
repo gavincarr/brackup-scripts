@@ -35,7 +35,8 @@ $< == 0        or die "Must run as root - aborting";
 chdir $run_dir or die "Cannot cd to $run_dir";
 
 # Load config file, if available
-my $config = Config::Tiny->read('brackup-run.conf') if -f 'brackup-run.conf';
+my $config_file = -f 'brackup-run.conf' ? 'brackup-run.conf' : '/etc/brackup-run.conf';
+my $config = Config::Tiny->read($config_file) if -f $config_file;
 if ($config) {
   $monthly          = $config->{_}->{monthly}      if ! defined $monthly;
   $snapshot         = $config->{_}->{snapshot}     if ! defined $snapshot;
@@ -68,12 +69,13 @@ for my $source (@ARGV) {
   printf STDERR "+ target: %s\n", $target || '' if $verbose;
 
   # If monthly mode, check if we this backup should be a monthly
-  my $murl = "$monthly_url/month-$source";
+  my $murl = "$monthly_url/month-$source-$target";
   printf STDERR "+ murl: %s\n", $murl if $verbose;
   my $monthly_update = 0;
   my $source_variant = $source;
   if ($monthly) {
     my $resp = $ua->get( $murl );
+    printf STDERR "+ murl_content: %s\n", ($resp->decoded_content||0) if $verbose;
     if (! $resp->is_success || $month > ($resp->decoded_content||0)) {
       $monthly_update++;
       $source_variant .= '-monthly';
