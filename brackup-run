@@ -75,7 +75,8 @@ for my $source (@ARGV) {
   my $source_variant = $source;
   if ($monthly) {
     my $resp = $ua->get( $murl );
-    printf STDERR "+ murl_content: %s\n", ($resp->decoded_content||0) if $verbose;
+    printf STDERR "+ murl_content: %s\n", ($resp->decoded_content||0) 
+      if $resp->is_success && $verbose;
     if (! $resp->is_success || $month > ($resp->decoded_content||0)) {
       $monthly_update++;
       $source_variant .= '-monthly';

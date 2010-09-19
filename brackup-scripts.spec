@@ -1,7 +1,7 @@
 
 Summary: Brackup wrapper scripts, supporting snapshots and monthly backups
 Name: brackup-scripts
-Version: 0.2
+Version: 0.2.1
 Release: 1%{?org_tag}%{?dist}
 Group: Applications/System
 License: Artistic
