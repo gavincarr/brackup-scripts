@@ -13,17 +13,29 @@ use LWP::UserAgent;
 use HTTP::Request::Common;
 
 sub usage {
-  die "usage: " . basename($0) . " [-v] [-n] [-t <target>] [-d <run_dir>] [--monthly] [-u <murl>] [--snapshot] <source> [<source2>...]\n";
+  my $fmt = "    %-25s %s\n";
+  print STDERR "usage: " . basename($0) . " [OPTIONS] <source> [<source2>...]\n";
+  print STDERR "    -?, -h, --help\n";
+  printf STDERR $fmt, '-d, --dir, --run-dir=DIR', 'Directory in which to run';
+  printf STDERR $fmt, '-t, --target=TARGET', 'Brackup target to use';
+  printf STDERR $fmt, '-s, --snapshot', 'Take an LVM snapshot before running brackup';
+  printf STDERR $fmt, '-S, --size=SIZE', 'Size to use for LVM snapshot';
+  printf STDERR $fmt, '-m, --monthly', "Append '-monthly' to source if first backup in the month";
+  printf STDERR $fmt, '-u, --monthly-url=URL', 'Base URL for read/write of monthly resource file';
+  printf STDERR $fmt, '-n, --noop', "Show what would be executed, but don't actually run";
+  printf STDERR $fmt, '-v, --verbose', "Give verbose output";
+  exit 1;
 }
 
 my $run_dir = '/root/brackup';
-my ($help, $noop, $verbose, $snapshot, $monthly, $monthly_url, $target);
+my ($help, $noop, $verbose, $snapshot, $snapshot_size, $monthly, $monthly_url, $target);
 usage unless GetOptions(
   'help|h|?'            => \$verbose,
   'noop|n'              => \$noop,
   'verbose|v'           => \$verbose,
   'dir|run-dir|d=s'     => \$run_dir,
   'snapshot|s!'         => \$snapshot,
+  'size|S=s'            => \$snapshot_size,
   'monthly|m!'          => \$monthly,
   'monthly-url|u=s'     => \$monthly_url,
   'target|t=s'          => \$target,
@@ -35,7 +47,8 @@ $< == 0        or die "Must run as root - aborting";
 chdir $run_dir or die "Cannot cd to $run_dir";
 
 # Load config file, if available
-my $config_file = -f 'brackup-run.conf' ? 'brackup-run.conf' : '/etc/brackup-run.conf';
+my $config_file = -f 'brackup-run.conf' ? 'brackup-run.conf' 
+                                        : '/etc/brackup/brackup-run.conf';
 my $config = Config::Tiny->read($config_file) if -f $config_file;
 if ($config) {
   $monthly          = $config->{_}->{monthly}      if ! defined $monthly;
@@ -105,7 +118,7 @@ for my $source (@ARGV) {
   # Get snapshot parameters and create snapshot
   my $snap;
   if ($snapshot) {
-    $snap = Snapshot->new($config, $source, $noop, $verbose);
+    $snap = Snapshot->new($config, $source, $snapshot_size, $noop, $verbose);
     $snap->dump if $verbose;
 
     # Run $snap_cmd (even in $noop mode)
@@ -158,7 +171,7 @@ package Snapshot;
 use File::Basename;
 
 sub new {
-  my ($class, $config, $source, $noop, $verbose) = @_;
+  my ($class, $config, $source, $size, $noop, $verbose) = @_;
   my $self = bless {}, $class;
 
   $self->{snap} = dirname($0) . '/snap';
@@ -168,7 +181,7 @@ sub new {
 
   $self->{mountpoint} = $config->{$source}->{mountpoint} || "/$source";
 
-  $self->{size} = $config->{$source}->{snapshot_size} || $config->{_}->{snapshot_size};
+  $self->{size} = $size ||  $config->{$source}->{snapshot_size} || $config->{_}->{snapshot_size};
   $self->{size} = $self->{size} ? '-S ' . $self->{size} : '';
   $self->{noop} = $noop ? '-n ' : '';
   $self->{verbose} = $verbose ? '-v ' : '';
@@ -200,4 +213,191 @@ sub cmd_unsnap {
 1;
 
 __END__
+
+=head1 NAME
+
+brackup-run - brackup wrapper script, supporting LVM snapshots, monthly 
+backups, and pre- and post-run scripts
+
+=head1 SYNOPSIS
+
+  $ brackup-run [-v] [-n] [-t <target>] [-d <run_dir>] [--monthly] [-u <murl>] [--snapshot] <source> [<source2>...]
+
+=head1 DESCRIPTION
+
+brackup-run is a wrapper script for the brackup backup utility, adding 
+support for LVM snapshots, monthly backups, and pre- and post-run scripts.
+
+=head2 CONFIG FILE
+
+brackup-run supports a config file, 'brackup-run.conf', located either in 
+your run directory (which defaults to '/root/brackup'), or in /etc/brackup.
+
+
+brackup-run.conf is an ini-style config, similar to the brackup.conf config.
+It supports global parameters at the top-level, and parameters within 
+per-source sections e.g.
+
+    snapshot = 1
+    monthly = 1
+    monthly_url = http://backup.example.com/brackup/
+
+    [home]
+    target = amazon
+    mountpoint = /home
+    snapshot_size = 250G
+
+Options are described in the following three sections. Some brackup-run options 
+can be supplied either in the config file or on the command line (overriding 
+those in the config); some are config file only; and some can only be supplied
+on the command line.
+
+Note: flag options take a boolean argument in the config file, but are used
+without arguments on the command line (i.e. use '--snapshot', not '--snapshot 1').
+
+=head2 GLOBAL OPTIONS
+
+=over 4
+
+=item snapshot = <BOOLEAN>
+
+Flag indicating whether to take an LVM snapshot of the source mountpoint 
+before running brackup. See also the 'mountpoint' and 'snapshot_size' options
+in the SOURCE SECTION OPTIONS section below. 
+
+Note that if using snapshots, make sure your brackup.conf source 'path' points
+to the snapshot filesystem, not the underlying one i.e. you want 
+'path = /home_snap', for instance, not 'path = /home'.
+
+Default: false (no snapshots). 
+
+Command line: '--snapshot', or '-s'.
+
+=item monthly = <BOOLEAN>
+
+Flag indicating whether to run 'monthly' backups. A monthly backup is just
+a backup from a specially named source, conventionally 'SOURCE-monthly', 
+allowing you to use different retention policies for normal vs. monthly
+backups.
+
+brackup-run uses a web resource mechanism for tracking when monthlies are
+done, so you should set and configure the 'monthly_url' option following
+if using monthlies.
+
+Default: false (don't use monthlies).
+
+Command line: '--monthly', or '-m'.
+
+=item monthly_url = <URL>
+
+URL namespace to use for tracking monthly backups. brackup-run reads (via 
+GET) and writes (via PUT) a resource called 'month-$SOURCE-$TARGET' within 
+the given namespace, so this needs to be configured appropriately (see the 
+'brackup-httpd.conf' file in the distribution for an example for apache).
+
+Example: http://localhost/brackup, or http://backup.example.com/brackup.
+
+Default: none. monthly_url is required if using monthly backups.
+
+Command line: '--monthly-url <URL>', or '-u <URL>'.
+
+=item pre_run <SCRIPT>
+
+Full path to script to be run once before any brackup runs commence. 
+Receives no parameters. If this script returns a non-zero exit code, 
+brackup-run will abort with an error. 
+
+Default: none.
+
+Command line: none.
+
+=item post_run <SCRIPT>
+
+Full path to script to be run once after brackup runs have completed.
+Receives one parameter, the exit code of the last brackup run (note that
+if this is non-zero, the run loop will have aborted, so not all runs will
+have been completed).
+
+If this script returns a non-zero exit code, brackup-run will abort with
+an error.
+
+Default: none.
+
+Command line: none.
+
+=back
+
+=head2 SOURCE SECTION OPTIONS
+
+=over 4
+
+=item target = <TARGET>
+
+Default target to use for this source. As usual, may be overridden on the 
+command line.
+
+Default: none.
+
+Command line: '--target <TARGET>', or '-t <TARGET>'.
+
+=item mountpoint = <MOUNTPOINT>
+
+Mountpoint associated with this source to snapshot. Note that this is the
+filesystem mountpoint itself, not the underlying LVM device. When creating
+the snapshot, brackup-run appends '_snap' to both the mountpoint and the 
+underlying LV name, so you should typically use /MOUNTPOINT_snap as your 
+source filesystem path. e.g. /home would be snapshotted to /home_snap.
+
+Default: /SOURCE e.g. /home for source 'home'.
+
+Command line: none.
+
+=item snapshot_size = <SIZE>
+
+Size of LVM snapshot to be created. Passed directly to 'lvcreate' -L, so may
+take standard size suffixes (K, M, G, T, P, E, etc.).
+
+Default: 250G.
+
+Command line: '--size <SIZE>' or '-S <size>'.
+
+=back
+
+=head2 COMMAND LINE ONLY OPTIONS
+
+=over 4
+
+=item --run-dir <DIR> | -d <DIR>
+
+Directory within which to run. Default: /root/brackup.
+
+=item --verbose | -v
+
+Increase verbosity.
+
+=item --noop | -n
+
+Don't actually execute brackup, just show what would be done.
+
+=back
+
+=head1 SEE ALSO
+
+L<brackup>, L<Brackup::Manual::Overview>
+
+=head1 WARRANTY
+
+brackup-run is distributed as-is and comes without warranty of any kind, 
+expressed or implied.
+
+=head1 AUTHOR
+
+Gavin Carr <gavin@openfusion.com.au>
+
+Copyright (c) 2010 Open Fusion Pty. Ltd.
+
+This module is free software. You may use, modify, and/or redistribute this 
+software under the terms of same terms as perl itself.
+
+=cut
 
