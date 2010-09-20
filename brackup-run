@@ -60,7 +60,26 @@ if ($verbose) {
   printf STDERR "+ month: %s\n",        $month || '' if $monthly;
 }
 
+# Check for pre_run and post_run scripts
+my ($pre_run, $post_run);
+if (my $pre_run = $config->{pre_run}) {
+  die "Missing pre_run script '$pre_run'\n" unless -f $pre_run;
+  die "Non-readable/executable pre_run script '$pre_run'\n" unless -x $pre_run;
+}
+if (my $post_run = $config->{post_run}) {
+  die "Missing post_run script '$post_run'\n" unless -f $post_run;
+  die "Non-readable/executable post_run script '$post_run'\n" unless -x $post_run;
+}
+
+# Run $pre_run script, if set
+if ($pre_run) {
+  system($pre_run);
+  die "pre_run script '$pre_run' returned non-zero exit code - aborting\n"
+    if $? != 0;
+}
+
 # Iterate over sources
+my $rc = 0;
 for my $source (@ARGV) {
   printf STDERR "+ [ starting brackup of source '$source' ]\n" if $verbose;
 
@@ -100,7 +119,6 @@ for my $source (@ARGV) {
   my $vflag = $verbose ? '-v' : '';
   my $cmd = "/usr/bin/brackup --from=$source_variant --to=$target --save-stats $vflag";
   print STDERR "+ cmd: $cmd\n" if $verbose;
-  my $rc;
   unless ($noop) {
     system($cmd);
     $rc = $?;
@@ -120,9 +138,17 @@ for my $source (@ARGV) {
     warn "Warning: unsnap cmd '$unsnap_cmd' failed\n" unless $? == 0;
   }
 
-  exit $rc if $rc;
+  last if $rc;
 }
 
+# Warn $post_run script, if set
+if ($post_run) {
+  system("$post_run $rc");
+  die "post_run script '$post_run' returned non-zero exit code - aborting\n"
+    if $? != 0;
+}
+
+exit $rc if $rc;
 exit 0;
 
 
