@@ -86,6 +86,7 @@ if (my $post_run = $config->{post_run}) {
 
 # Run $pre_run script, if set
 if ($pre_run) {
+  printf STDERR "+ executing pre_run: %s\n", $pre_run if $verbose;
   system($pre_run);
   die "pre_run script '$pre_run' returned non-zero exit code - aborting\n"
     if $? != 0;
@@ -156,6 +157,7 @@ for my $source (@ARGV) {
 
 # Warn $post_run script, if set
 if ($post_run) {
+  printf STDERR "+ executing post_run: %s %s\n", $post_run, $rc if $verbose;
   system("$post_run $rc");
   die "post_run script '$post_run' returned non-zero exit code - aborting\n"
     if $? != 0;
