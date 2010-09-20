@@ -34,6 +34,8 @@ install -m0755 brackup-run %{buildroot}%{_bindir}
 install -m0755 snap %{buildroot}%{_bindir}
 /usr/bin/pod2man brackup-run > %{buildroot}%{_mandir}/man1/brackup-run.1
 
+cd %{buildroot}%{_bindir} && ln -s snap unsnap
+
 %clean
 rm -rf %{buildroot}
 
