@@ -35,7 +35,6 @@ $snap_mp ||= $mp . '_snap';
 # Quick and dirty 'mount(1)' hacking - should really be/use a CPAN module
 my ($vg, $lv);
 my @mount = split /\n/, qx(mount);
-pop @mount;
 die "Error: cannot get mounted filesystems\n" unless @mount;
 
 my @mount_entry = grep { my @elt = split /\s+/, $_; ($elt[2]||'') eq $mp } @mount

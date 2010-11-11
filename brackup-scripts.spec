@@ -1,7 +1,7 @@
 
 Summary: Brackup wrapper scripts, supporting snapshots and monthly backups
 Name: brackup-scripts
-Version: 0.3
+Version: 0.3.1
 Release: 1%{?org_tag}%{?dist}
 Group: Applications/System
 License: Artistic
@@ -47,6 +47,9 @@ rm -rf %{buildroot}
 %{_mandir}/man1/brackup-run*
 
 %changelog
+* Thu Nov 11 2010 Gavin Carr <gavin@openfusion.com.au> - 0.3.1-1
+- Fix buglet in snap mount table handling.
+
 * Mon Sep 20 2010 Gavin Carr <gavin@openfusion.com.au> - 0.3-1
 - Add support for pre_run and post_run scripts to brackup-run.
 - Add initial perldoc to brackup-run.
