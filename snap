@@ -6,7 +6,7 @@
 use strict;
 use File::Basename;
 use Getopt::Long qw(:config no_ignore_case bundling);
-use IPC::Run qw(run);
+use IPC::Run3;
 
 # Defaults
 my $size = '250G';
@@ -86,7 +86,7 @@ my $run = sub {
   return if $noop;
 
   my @cmd = split /\s+/, $cmd;
-  run(\@cmd, \undef)
+  run3(\@cmd, \undef)
     or die "'$cmd' failed, returning $!\n";
 };
 
@@ -107,7 +107,7 @@ if ($me eq 'snap') {
 elsif ($me eq 'unsnap') {
   # Unmount if mounted
   my $mount_list;
-  run([ 'mount' ], '>&', \$mount_list);
+  run3([ 'mount' ], \undef, \$mount_list);
   if ($mount_list =~ m{ on $snap_mp\b}ms) {
     $run->("umount -f $snap_mp");
   }
