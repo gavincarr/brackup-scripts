@@ -1,7 +1,7 @@
 
 Summary: Brackup wrapper scripts, supporting snapshots and monthly backups
 Name: brackup-scripts
-Version: 0.3.1
+Version: 0.3.2
 Release: 1%{?org_tag}%{?dist}
 Group: Applications/System
 License: Artistic
@@ -47,6 +47,9 @@ rm -rf %{buildroot}
 %{_mandir}/man1/brackup-run*
 
 %changelog
+* Sun Nov 14 2010 Gavin Carr <gavin@openfusion.com.au> - 0.3.2-1
+- Migrate snap from IPC::Run to IPC::Run3.
+
 * Thu Nov 11 2010 Gavin Carr <gavin@openfusion.com.au> - 0.3.1-1
 - Fix buglet in snap mount table handling.
 
