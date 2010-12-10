@@ -1,7 +1,7 @@
 
 Summary: Brackup wrapper scripts, supporting snapshots and monthly backups
 Name: brackup-scripts
-Version: 0.3.2
+Version: 0.3.3
 Release: 1%{?org_tag}%{?dist}
 Group: Applications/System
 License: Artistic
@@ -27,6 +27,7 @@ mkdir -p %{buildroot}%{_sysconfdir}/httpd/conf.d
 mkdir -p %{buildroot}%{_sysconfdir}/brackup
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{_mandir}/man1
+mkdir -p %{buildroot}%{_localstatedir}/www/brackup
 
 install -m0644 conf/brackup-run.conf %{buildroot}%{_sysconfdir}/brackup
 install -m0644 conf/brackup-httpd.conf %{buildroot}%{_sysconfdir}/httpd/conf.d/brackup.conf
@@ -45,8 +46,12 @@ rm -rf %{buildroot}
 %config(noreplace) %{_sysconfdir}/httpd/conf.d/brackup.conf
 %attr(0755,root,root) %{_bindir}/*
 %{_mandir}/man1/brackup-run*
+%attr(0755,apache,apache) %{_localstatedir}/www/brackup
 
 %changelog
+* Fri Nov 26 2010 Gavin Carr <gavin@openfusion.com.au> - 0.3.3-1
+- Add /var/www/brackup directory creation.
+
 * Sun Nov 14 2010 Gavin Carr <gavin@openfusion.com.au> - 0.3.2-1
 - Migrate snap from IPC::Run to IPC::Run3.
 
