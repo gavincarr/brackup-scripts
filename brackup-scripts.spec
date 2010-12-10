@@ -1,7 +1,7 @@
 
 Summary: Brackup wrapper scripts, supporting snapshots and monthly backups
 Name: brackup-scripts
-Version: 0.3.3
+Version: 0.3.4
 Release: 1%{?org_tag}%{?dist}
 Group: Applications/System
 License: Artistic
@@ -49,6 +49,9 @@ rm -rf %{buildroot}
 %attr(0755,apache,apache) %{_localstatedir}/www/brackup
 
 %changelog
+* Fri Nov 26 2010 Gavin Carr <gavin@openfusion.com.au> - 0.3.4-1
+- Allow brackup-run snapshot,monthly{,_url} to be set per source.
+
 * Fri Nov 26 2010 Gavin Carr <gavin@openfusion.com.au> - 0.3.3-1
 - Add /var/www/brackup directory creation.
 
