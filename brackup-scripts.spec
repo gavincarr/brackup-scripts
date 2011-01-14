@@ -1,8 +1,8 @@
 
 Summary: Brackup wrapper scripts, supporting snapshots and monthly backups
 Name: brackup-scripts
-Version: 0.3.4
-Release: 1%{?org_tag}%{?dist}
+Version: 0.3.5
+Release: 1%{?org_tag}
 Group: Applications/System
 License: Artistic
 URL: http://www.openfusion.net/tags/brackup
@@ -49,6 +49,9 @@ rm -rf %{buildroot}
 %attr(0755,apache,apache) %{_localstatedir}/www/brackup
 
 %changelog
+* Fri Jan 14 2011 Gavin Carr <gavin@openfusion.com.au> - 0.3.5-1
+- Remove %dist tag from spec file, since nothing distro-specific.
+
 * Fri Nov 26 2010 Gavin Carr <gavin@openfusion.com.au> - 0.3.4-1
 - Allow brackup-run snapshot,monthly{,_url} to be set per source.
 
