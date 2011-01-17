@@ -2,7 +2,7 @@
 Summary: Brackup wrapper scripts, supporting snapshots and monthly backups
 Name: brackup-scripts
 Version: 0.3.5
-Release: 1%{?org_tag}
+Release: 2%{?org_tag}%{dist}
 Group: Applications/System
 License: Artistic
 URL: http://www.openfusion.net/tags/brackup
@@ -49,6 +49,9 @@ rm -rf %{buildroot}
 %attr(0755,apache,apache) %{_localstatedir}/www/brackup
 
 %changelog
+* Mon Jan 17 2011 Gavin Carr <gavin@openfusion.com.au> - 0.3.5-2
+- Add %dist tag back to spec file due to rhel6 incompatibilities.
+
 * Fri Jan 14 2011 Gavin Carr <gavin@openfusion.com.au> - 0.3.5-1
 - Remove %dist tag from spec file, since nothing distro-specific.
 
