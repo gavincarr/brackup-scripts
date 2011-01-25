@@ -117,9 +117,13 @@ for my $source (@ARGV) {
     $murl = "$monthly_url/month-$source-$target";
     printf STDERR "+ murl: %s\n", $murl if $verbose;
     my $resp = $ua->get( $murl );
-    printf STDERR "+ murl_content: %s\n", ($resp->decoded_content||0) 
-      if $resp->is_success && $verbose;
-    if (! $resp->is_success || $month > ($resp->decoded_content||0)) {
+    my $murl_content = 0;
+    if ($resp->is_success) {
+      $murl_content = $resp->decoded_content||0;
+      chomp $murl_content;
+      print STDERR "+ murl_content: $murl_content\n" if $verbose;
+    }
+   if (! $resp->is_success || $month > $murl_content) {
       $monthly_update++;
       $source_variant .= '-monthly';
     }
