@@ -90,6 +90,10 @@ my $run = sub {
     or die "'$cmd' failed, returning $!\n";
 };
 
+# FIXME: suppress LVM "file descriptor x left open" messages
+# (bogus warning, or real IPC::Run3 problem?)
+$ENV{LVM_SUPPRESS_FD_WARNINGS} = 1;
+
 # Snap mode
 if ($me eq 'snap') {
 
