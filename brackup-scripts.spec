@@ -1,7 +1,7 @@
 
 Summary: Brackup wrapper scripts, supporting snapshots and monthly backups
 Name: brackup-scripts
-Version: 0.3.6
+Version: 0.3.7
 Release: 1%{?org_tag}%{dist}
 Group: Applications/System
 License: Artistic
@@ -49,6 +49,9 @@ rm -rf %{buildroot}
 %attr(0755,apache,apache) %{_localstatedir}/www/brackup
 
 %changelog
+* Fri Jul 01 2011 Gavin Carr <gavin@openfusion.com.au> 0.3.7-1
+- Suppress bogus(?) LVM file descriptor warning in snap/unsnap.
+
 * Tue Jan 25 2011 Gavin Carr <gavin@openfusion.com.au> - 0.3.6-1
 - Tweak brackup-run monthly url content handling to make more robust.
 
