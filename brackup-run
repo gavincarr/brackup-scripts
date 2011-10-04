@@ -197,7 +197,7 @@ sub new {
   $self->{mountpoint} = $config->{$source}->{mountpoint} || "/$source";
 
   $self->{size} = $size ||  $config->{$source}->{snapshot_size} || $config->{_}->{snapshot_size};
-  $self->{size} = $self->{size} ? '-S ' . $self->{size} : '';
+  $self->{size} = $self->{size} ? "-S $self->{size} " : '';
   $self->{noop} = $noop ? '-n ' : '';
   $self->{verbose} = $verbose ? '-v ' : '';
 
