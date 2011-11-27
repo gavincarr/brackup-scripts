@@ -27,14 +27,13 @@ sub usage {
   exit 1;
 }
 
-my $run_dir = '/root/brackup';
 my ($help, $noop, $verbose, $snapshot_size, $target);
-my ($global_snapshot, $global_monthly, $global_monthly_url);
+my ($run_dir, $global_snapshot, $global_monthly, $global_monthly_url);
 usage unless GetOptions(
   'help|h|?'            => \$verbose,
   'noop|n'              => \$noop,
   'verbose|v'           => \$verbose,
-  'dir|run-dir|d=s'     => \$run_dir,
+  'run-dir|dir|d=s'     => \$run_dir,
   'snapshot|s!'         => \$global_snapshot,
   'size|S=s'            => \$snapshot_size,
   'monthly|m!'          => \$global_monthly,
@@ -52,10 +51,12 @@ my $config_file = -f 'brackup-run.conf' ? 'brackup-run.conf'
                                         : '/etc/brackup/brackup-run.conf';
 my $config = Config::Tiny->read($config_file) if -f $config_file;
 if ($config) {
-  $global_snapshot         = $config->{_}->{snapshot}     if ! defined $global_snapshot;
-  $global_monthly          = $config->{_}->{monthly}      if ! defined $global_monthly;
-  $global_monthly_url      = $config->{_}->{monthly_url}  if ! defined $global_monthly_url;
+  $run_dir                  = $config->{_}->{run_dir}     if ! defined $run_dir;
+  $global_snapshot          = $config->{_}->{snapshot}    if ! defined $global_snapshot;
+  $global_monthly           = $config->{_}->{monthly}     if ! defined $global_monthly;
+  $global_monthly_url       = $config->{_}->{monthly_url} if ! defined $global_monthly_url;
 }
+$run_dir ||= '/root/brackup';
 
 my $month = DateTime->today->strftime('%Y%m');
 my $ua = LWP::UserAgent->new;
