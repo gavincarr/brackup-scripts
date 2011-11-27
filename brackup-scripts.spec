@@ -1,7 +1,7 @@
 
 Summary: Brackup wrapper scripts, supporting snapshots and monthly backups
 Name: brackup-scripts
-Version: 0.3.7
+Version: 0.3.8
 Release: 1%{?org_tag}%{dist}
 Group: Applications/System
 License: Artistic
@@ -41,7 +41,7 @@ cd %{buildroot}%{_bindir} && ln -s snap unsnap
 rm -rf %{buildroot}
 
 %files
-%defattr(0644,root,root)
+%defattr(-,root,root)
 %config(noreplace) %{_sysconfdir}/brackup/brackup-run.conf
 %config(noreplace) %{_sysconfdir}/httpd/conf.d/brackup.conf
 %attr(0755,root,root) %{_bindir}/*
@@ -49,6 +49,9 @@ rm -rf %{buildroot}
 %attr(0755,apache,apache) %{_localstatedir}/www/brackup
 
 %changelog
+* Tue Oct 04 2011 Gavin Carr <gavin@openfusion.com.au> 0.3.8-1
+- Fix buglet in brackup-run script if snapshot size specified.
+
 * Fri Jul 01 2011 Gavin Carr <gavin@openfusion.com.au> 0.3.7-1
 - Suppress bogus(?) LVM file descriptor warning in snap/unsnap.
 
