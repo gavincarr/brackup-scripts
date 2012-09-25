@@ -89,7 +89,7 @@ my $run = sub {
   run3(\@cmd, \undef);
   if ($? != 0) {
     my $rc = $? >> 8;
-    die "Command '$cmd' failed, return code $?\n";
+    die "Command '$cmd' failed, return code $rc\n";
   }
 };
 
