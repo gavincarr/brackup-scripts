@@ -1,7 +1,7 @@
 
 Summary: Brackup wrapper scripts, supporting snapshots and monthly backups
 Name: brackup-scripts
-Version: 0.3.9
+Version: 0.3.10
 Release: 1%{?org_tag}%{dist}
 Group: Applications/System
 License: Artistic
@@ -49,6 +49,9 @@ rm -rf %{buildroot}
 %attr(0755,apache,apache) %{_localstatedir}/www/brackup
 
 %changelog
+* Mon Nov 28 2011 Gavin Carr <gavin@openfusion.com.au> 0.3.10-1
+- Fix buglet with run_dir change.
+
 * Mon Nov 28 2011 Gavin Carr <gavin@openfusion.com.au> 0.3.9-1
 - Allow run_dir to be set in brackup-run.conf.
 

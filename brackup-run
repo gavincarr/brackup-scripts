@@ -44,7 +44,6 @@ usage if $help;
 usage unless @ARGV;
 
 $< == 0        or die "Must run as root - aborting";
-chdir $run_dir or die "Cannot cd to $run_dir";
 
 # Load config file, if available
 my $config_file = -f 'brackup-run.conf' ? 'brackup-run.conf' 
@@ -57,6 +56,7 @@ if ($config) {
   $global_monthly_url       = $config->{_}->{monthly_url} if ! defined $global_monthly_url;
 }
 $run_dir ||= '/root/brackup';
+chdir $run_dir or die "Cannot cd to $run_dir";
 
 my $month = DateTime->today->strftime('%Y%m');
 my $ua = LWP::UserAgent->new;
