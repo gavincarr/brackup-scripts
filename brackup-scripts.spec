@@ -1,7 +1,7 @@
 
 Summary: Brackup wrapper scripts, supporting snapshots and monthly backups
 Name: brackup-scripts
-Version: 0.3.10
+Version: 0.3.11
 Release: 1%{?org_tag}%{dist}
 Group: Applications/System
 License: Artistic
@@ -49,6 +49,9 @@ rm -rf %{buildroot}
 %attr(0755,apache,apache) %{_localstatedir}/www/brackup
 
 %changelog
+* Tue Sep 25 2012 Gavin Carr <gavin@openfusion.com.au> 0.3.11-1
+- Fix bug with snap script not checking for run3 failures correctly.
+
 * Mon Nov 28 2011 Gavin Carr <gavin@openfusion.com.au> 0.3.10-1
 - Fix buglet with run_dir change.
 

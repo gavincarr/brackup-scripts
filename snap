@@ -86,8 +86,11 @@ my $run = sub {
   return if $noop;
 
   my @cmd = split /\s+/, $cmd;
-  run3(\@cmd, \undef)
-    or die "'$cmd' failed, returning $!\n";
+  run3(\@cmd, \undef);
+  if ($? != 0) {
+    my $rc = $? >> 8;
+    die "Command '$cmd' failed, return code $?\n";
+  }
 };
 
 # FIXME: suppress LVM "file descriptor x left open" messages
