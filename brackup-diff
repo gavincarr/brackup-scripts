@@ -1,0 +1,76 @@
+#!/usr/bin/perl
+#
+# Brackup diff utility for comparing a restored directory tree with its source,
+# taking into account brackup root ignore patterns.
+#
+
+use strict;
+use warnings;
+use File::Basename;
+use Getopt::Long qw(:config no_ignore_case bundling);
+use File::DirCompare;
+use Brackup;
+
+sub usage {
+  warn @_ if @_;
+  die "usage: " . basename($0) . " [-v] [-n] [--config <config>] [--source-root <path>] --source <source> <dir1> <dir2>\n";
+}
+
+$|++;
+
+my $verbose = 0;
+my ($help, $noop, $config_file, $source, $source_root);
+usage unless GetOptions(
+  'help|h|?'        => \$help,
+  'verbose|v+'      => \$verbose,
+  'noop|n'          => \$noop,
+  'config=s'        => \$config_file,
+  'source=s'        => \$source,
+  'source_root=s'   => \$source_root,
+);
+usage if $help;
+usage "Exactly two directory arguments required\n" unless @ARGV == 2;
+usage "--source is a required field\n" unless $source;
+
+$verbose ||= 1 if $noop;
+
+my $dir1 = shift @ARGV;
+my $dir2 = shift @ARGV;
+$dir1 =~ s!/$!!;
+$dir2 =~ s!/$!!;
+-d $dir1 or die "$dir1 is not a directory\n";
+-d $dir2 or die "$dir2 is not a directory\n";
+
+my $config = eval { Brackup::Config->load($config_file) }
+  or usage $@;
+my $root = eval { $config->load_root($source) }
+  or usage $@;
+$source_root ||= $root->{path};
+
+my $diff_count = 0;
+File::DirCompare->compare($dir1, $dir2, sub {
+  my ($a, $b) = @_;
+
+  # Relativise paths within source root to match the way ignore regexes are matched
+  my $a_rel = $a;
+  $a_rel =~ s!^$source_root/?!! if $a_rel;
+
+  # Skip if match ignore patterns
+  if ($a_rel =~ $root->{ignore_ra} or
+     (-d $a and "$a_rel/" =~ $root->{ignore_ra}->re)) {
+    printf "+ $a matches ignore pattern - skipping\n" if $verbose >= 2;
+    return;
+  }
+
+  $diff_count++;
+  if (! $b) {
+    printf "Only in %s: %s\n", dirname($a), basename($a);
+  } elsif (! $a) {
+    printf "Only in %s: %s\n", dirname($b), basename($b);
+  } else {
+    print "Files $a and $b differ\n";
+  }
+});
+
+exit $diff_count ? 1 : 0;
+
