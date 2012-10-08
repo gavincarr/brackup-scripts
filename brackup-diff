@@ -43,6 +43,7 @@ my $config = eval { Brackup::Config->load($config_file) }
 my $root = eval { $config->load_root($source) }
   or usage $@;
 $source_root ||= $root->path;
+print "+ config loaded, kicking off comparison...\n" if $verbose;
 
 my $diff_count = 0;
 File::DirCompare->compare($dir1, $dir2, sub {
