@@ -1,7 +1,7 @@
 
 Summary: Brackup wrapper scripts, supporting snapshots and monthly backups
 Name: brackup-scripts
-Version: 0.4
+Version: 0.4.1
 Release: 1%{?org_tag}%{dist}
 Group: Applications/System
 License: Artistic
@@ -33,6 +33,7 @@ install -m0644 conf/brackup-run.conf %{buildroot}%{_sysconfdir}/brackup
 install -m0644 conf/brackup-httpd.conf %{buildroot}%{_sysconfdir}/httpd/conf.d/brackup.conf
 install -m0755 brackup-run %{buildroot}%{_bindir}
 install -m0755 snap %{buildroot}%{_bindir}
+install -m0755 brackup-diff %{buildroot}%{_bindir}
 /usr/bin/pod2man brackup-run > %{buildroot}%{_mandir}/man1/brackup-run.1
 
 cd %{buildroot}%{_bindir} && ln -s snap unsnap
@@ -49,6 +50,9 @@ rm -rf %{buildroot}
 %attr(0755,apache,apache) %{_localstatedir}/www/brackup
 
 %changelog
+* Mon Oct 08 2012 Gavin Carr <gavin@openfusion.com.au> 0.4.1-1
+- Add missing brackup-diff to spec file.
+
 * Fri Oct 05 2012 Gavin Carr <gavin@openfusion.com.au> 0.4-1
 - Add brackup-diff utility.
 
