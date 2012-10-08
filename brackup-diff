@@ -19,11 +19,10 @@ sub usage {
 $|++;
 
 my $verbose = 0;
-my ($help, $noop, $config_file, $source, $source_root);
+my ($help, $config_file, $source, $source_root);
 usage unless GetOptions(
   'help|h|?'        => \$help,
   'verbose|v+'      => \$verbose,
-  'noop|n'          => \$noop,
   'config=s'        => \$config_file,
   'source=s'        => \$source,
   'source_root=s'   => \$source_root,
@@ -31,8 +30,6 @@ usage unless GetOptions(
 usage if $help;
 usage "Exactly two directory arguments required\n" unless @ARGV == 2;
 usage "--source is a required field\n" unless $source;
-
-$verbose ||= 1 if $noop;
 
 my $dir1 = shift @ARGV;
 my $dir2 = shift @ARGV;
@@ -58,7 +55,7 @@ File::DirCompare->compare($dir1, $dir2, sub {
   # Skip if path matches ignore patterns
   for my $pattern (@{ $root->{ignore} }) {
     if ($a_rel =~ /$pattern/ or (-d $a and "$a_rel/" =~ /$pattern/)) {
-      printf "+ $a matches ignore pattern - skipping\n" if $verbose >= 2;
+      print "+ $a matches ignore pattern - skipping\n" if $verbose;
       return;
     }
   }
