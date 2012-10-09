@@ -27,12 +27,13 @@ sub usage {
   exit 1;
 }
 
-my ($help, $noop, $verbose, $snapshot_size, $target);
+my $verbose = 0;
+my ($help, $noop, $snapshot_size, $target);
 my ($run_dir, $global_snapshot, $global_monthly, $global_monthly_url);
 usage unless GetOptions(
   'help|h|?'            => \$verbose,
   'noop|n'              => \$noop,
-  'verbose|v'           => \$verbose,
+  'verbose|v+'          => \$verbose,
   'run-dir|dir|d=s'     => \$run_dir,
   'snapshot|s!'         => \$global_snapshot,
   'size|S=s'            => \$snapshot_size,
@@ -144,7 +145,7 @@ for my $source (@ARGV) {
   }
 
   # Run brackup
-  my $vflag = $verbose ? '-v' : '';
+  my $vflag = '-v ' x $verbose;
   my $cmd = "/usr/bin/brackup --from=$source_variant --to=$target --save-stats $vflag";
   print STDERR "+ cmd: $cmd\n" if $verbose;
   unless ($noop) {
