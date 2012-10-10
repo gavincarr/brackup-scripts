@@ -44,6 +44,16 @@ my $root = eval { $config->load_root($source) }
   or usage $@;
 $source_root ||= $root->path;
 print "+ config loaded, kicking off comparison...\n" if $verbose;
+my $options = {};
+
+# If File::DirCompare is new enough, report on matches if $verbose >= 2
+if ($verbose >= 2 and $File::DirCompare::VERSION >= 0.7) {
+  $options->{matches} = sub {
+    my ($a, $b) = @_;
+    $a =~ s!^$source_root/?!!;
+    print "++ $a matches\n";
+  };
+}
 
 my $diff_count = 0;
 File::DirCompare->compare($dir1, $dir2, sub {
@@ -69,7 +79,7 @@ File::DirCompare->compare($dir1, $dir2, sub {
   } else {
     print "Files $a and $b differ\n";
   }
-});
+}, $options);
 
 exit $diff_count ? 1 : 0;
 
