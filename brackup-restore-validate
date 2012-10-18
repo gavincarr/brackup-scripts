@@ -1,0 +1,263 @@
+#!/usr/bin/perl
+#
+# Helper script for brackup restore validation runs
+#
+
+use strict;
+use warnings;
+use File::Basename;
+use Getopt::Long qw(:config no_ignore_case bundling);
+use Config::Tiny;
+use Time::Piece;
+use IPC::Run;
+use File::Spec;
+use File::Path 2.0 qw(remove_tree);
+use YAML qw(LoadFile DumpFile);
+use Carp;
+use Data::Dump qw(pp);
+
+use Brackup;
+
+sub usage {
+  warn @_ if @_;
+  die "usage: " . basename($0) . " [-l] [-v] [-n] [-i <icnt>] [-c <configfile>] [-u <user>] [-L <limit>] [--auto] <profile>\n";
+}
+
+$|++;
+
+my $configfile = '/etc/brackup/brackup-restore-validate.conf';
+my $verbose = 0;
+my ($help, $noop, $list, $limit, $auto, $user, $ignore_count);
+usage unless GetOptions(
+  'help|h|?'        => \$help,
+  'verbose|v+'      => \$verbose,
+  'noop|n'          => \$noop,
+  'config|c=s'      => \$configfile,
+  'list|l'          => \$list,
+  'limit|L=i'       => \$limit,
+  'auto|a'          => \$auto,
+  'user|u=s'        => \$user,
+  'ignore|i=i'      => \$ignore_count,
+);
+usage if $help;
+usage if ! $list and @ARGV != 1;
+$verbose = 1 if $noop;
+
+my $profile = shift @ARGV;
+
+# Read config
+-f $configfile
+  or usage "Missing configfile '$configfile'\n";
+my $config = Config::Tiny->read( $configfile );
+
+if ($list) {
+  print join("\n", grep ! /^_$/, sort keys %$config) . "\n";
+  exit 0;
+}
+
+usage "Profile '$profile' not found in configfile '$configfile'\n"
+  unless $config->{$profile};
+print "+ profile: $profile\n" if $verbose;
+
+my $source = $config->{$profile}->{source} || $config->{_}->{source};
+my $data_dir = $config->{$profile}->{data_dir} || $config->{_}->{data_dir};
+my $brackup_file_dir = $config->{$profile}->{brackup_file_dir} || $config->{_}->{brackup_file_dir};
+my $restore_file_dir = $config->{$profile}->{restore_file_dir} || $config->{_}->{restore_file_dir};
+my $restore_output_dir = $config->{$profile}->{restore_output_dir} || $config->{_}->{restore_output_dir};
+my $target_size = $config->{$profile}->{target_size} || $config->{_}->{target_size};
+$ignore_count = $config->{$profile}->{no_repeat_count} if ! defined $ignore_count;
+$ignore_count = $config->{_}->{no_repeat_count}        if ! defined $ignore_count;
+$user ||= $config->{$profile}->{default_user} || $config->{_}->{default_user};
+$user ||= 'root';
+$limit = $target_size ? ($auto ? 1 : 10) : 0 if ! defined $limit;
+
+my $brackup_config = eval { Brackup::Config->load }
+  or die "Cannot load brackup config: $@";
+my $root = eval { $brackup_config->load_root($source) }
+  or die "Cannot load source $source: $@";
+$data_dir ||= $root->path;
+
+if ($verbose) {
+  print "+ source: $source\n";
+  print "+ data_dir: $data_dir\n";
+  print "+ brackup_file_dir: $brackup_file_dir\n";
+  print "+ restore_file_dir: $restore_file_dir\n";
+  print "+ restore_output_dir: $restore_output_dir\n";
+  print "+ target_size: $target_size\n"   if $target_size;
+  print "+ ignore_count: $ignore_count\n" if defined $ignore_count;
+  print "+ user: $user\n";
+}
+
+# Check restore directory
+my $ts_dt  = localtime->strftime('%Y%m%d');
+my $ts_dtm = localtime->strftime('%Y%m%dT%H%M%S');
+my $output_dir = "$restore_output_dir/$ts_dt";
+if (-d $output_dir) {
+  die "Restore directory $output_dir exists and is not empty\n"
+    if glob("$output_dir/*");
+}
+-d $restore_file_dir or mkdir($restore_file_dir)
+  or die "Can't mkdir '$restore_file_dir'";
+
+# Get per-profile globs from config file
+my $test_tree_glob = $config->{$profile}->{test_tree_glob} || '*';
+my $brackup_file_glob = $config->{$profile}->{brackup_file_glob}
+  or die "No 'brackup_file_glob' set for profile '$profile'\n";
+$test_tree_glob = "$data_dir/$test_tree_glob" if $test_tree_glob !~ m!^/!;
+$brackup_file_glob = "$brackup_file_dir/$brackup_file_glob" if $brackup_file_glob !~ m!^/!;
+print "+ test_tree_glob: $test_tree_glob\n" if $verbose;
+print "+ brackup_file_glob: $brackup_file_glob\n" if $verbose;
+
+# Select brackup file
+my $brackup_file = qx(ls -t $brackup_file_glob | head -n1);
+chomp $brackup_file;
+print "+ brackup_file: $brackup_file\n" if $verbose;
+
+# Load ignore paths
+my @ignore_paths = get_ignore_paths(
+  data_dir            => $data_dir,
+  restore_file_dir    => $restore_file_dir,
+  prefix              => $profile,
+  count               => $ignore_count,
+) if $ignore_count;
+print "+ ignore_paths:\n  ++ " . join("\n  ++ ", @ignore_paths) . "\n" if @ignore_paths and $verbose;
+
+# Select test tree entries
+my @test_tree_entries = get_test_tree_entries(
+  glob                => $test_tree_glob,
+  limit               => $limit,
+  target_size         => $target_size,
+  ignore              => \@ignore_paths,
+);
+print join("\n", map { sprintf "TEST_TREE=%-80s (%-5.1fM)", $_->[1], $_->[0]/1000 } @test_tree_entries) . "\n";
+
+# Print restore cmd
+print "brackup-restore -v --from=$brackup_file --to=$output_dir --just=\$TEST_TREE\n";
+
+# If --auto, kick off the restore
+my $status;
+if ($auto) {
+  die "--limit must be 1 with --auto\n" if @test_tree_entries != 1;
+  sleep 1;
+
+  my $test_tree = File::Spec->abs2rel($test_tree_entries[0]->[1], $data_dir);
+  IPC::Run::run(qq(brackup-restore -v --from=$brackup_file --to=$output_dir --just="$test_tree"))
+    or die "restore failed: $?";
+
+  print "\n\n** Restore successful **\n\n\n** Checking restored data **\n\n";
+
+  my $diff = '';
+  print qq(brackup-diff --source $source "$data_dir/$test_tree" $output_dir\n);
+  my $rv = IPC::Run::run([qw(brackup-diff), '--source', $source, "$data_dir/$test_tree", $output_dir], \undef, \$diff, \$diff);
+
+  $diff =~ s/\s+$//;
+  if (! $rv) {
+    print "\n\n** Diff failed, return code $rv, \$? is $?, output:\n\n$diff\n";
+    $status = 'DIFF_FAIL';
+  }
+
+  elsif ($diff) {
+    print "\n\n** Diff completed, differences found:\n\n$diff\n";
+    $status = 'DIFFS_FOUND';
+  }
+
+  else {
+    print "\n\n** Diff completed, no differences found, restore-validate completed successfully!\n\n";
+    $status = 'OK';
+
+    # Normal case complete - clean up restored tree
+    remove_tree($output_dir);
+  }
+
+  # Dump results to restore_file_dir (record: date, user, profile, test_tree, size, status)
+  my $results = {
+    date        => $ts_dt,
+    profile     => $profile,
+    source      => $source,
+    data_dir    => $data_dir,
+    user        => $user,
+    test_tree   => $test_tree,
+    size_mb     => int($test_tree_entries[0]->[0] / 1000),
+    status      => $status,
+  };
+  DumpFile("$restore_file_dir/$profile-$ts_dtm.yml", $results);
+  print "\n** Results recorded to $restore_file_dir/$profile-$ts_dtm.yml **\n\n";
+}
+
+# ---------------------------------------------------------------------------
+# Subroutines
+
+# Get the set of test tree candidates to restore
+sub get_test_tree_entries
+{
+  my %arg = @_;
+  my $glob = delete $arg{glob}
+    or croak "Missing required argument 'glob'";
+  my $limit = delete $arg{limit};
+  my $target_size = delete $arg{target_size};
+  my $ignore = delete $arg{ignore};
+  croak "Invalid argument(s): " . join(',', sort keys %arg) if %arg;
+  croak "Can't set limit without target_size" if $limit && ! $target_size;
+  my %ignore = map { $_ => 1 } @$ignore if $ignore;
+  $target_size =~ s/_//g if $target_size;
+
+  my $test_tree_output = qx(du -s $glob);
+  chomp $test_tree_output;
+
+  my @entries =
+      map {
+        my ($size, $path) = split /\s+/, $_, 2;
+        [ $size, $path, $target_size ? abs($target_size/1000 - $size) : () ]
+      }
+      grep { my ($size, $path) = split /\s+/; $size > 100_000 }
+      split /\n/, $test_tree_output;
+
+  # If target_size set, sort by size delta
+  if ($target_size) {
+    @entries = sort { $a->[2] <=> $b->[2] } @entries;
+  }
+
+  # If no target_size set, just sort by size
+  else {
+    @entries = sort { $a->[0] <=> $b->[0] } @entries;
+  }
+
+  # Prune ignored entries
+  @entries = grep { ! $ignore{$_->[1]} } @entries if $ignore;
+
+  # Prune down to limit, if applicable
+  splice @entries, $limit if $limit;
+
+  return @entries;
+}
+
+# Derive the set of paths to ignore as having already been recently checked
+sub get_ignore_paths
+{
+  my %arg = @_;
+  my $data_dir = delete $arg{data_dir}
+    or croak "Missing required argument 'data_dir'";
+  my $restore_file_dir = delete $arg{restore_file_dir}
+    or croak "Missing required argument 'restore_file_dir'";
+  my $prefix = delete $arg{prefix}
+    or croak "Missing required argument 'prefix'";
+  my $count = delete $arg{count}
+    or croak "Missing required argument 'count'";
+  croak "Invalid argument(s): " . join(',', sort keys %arg) if %arg;
+
+  my @restore_files = sort { basename($b) cmp basename($a) }
+                      glob "$restore_file_dir/$prefix-*.yml"
+    or return;
+
+  splice @restore_files, $count;
+
+  my @ignore_paths;
+  for (@restore_files) {
+    my $data = LoadFile $_;
+    croak "Missing 'test_tree' element in '$_'" unless $data->{test_tree};
+    push @ignore_paths, File::Spec->rel2abs($data->{test_tree}, $data_dir);
+  }
+
+  return wantarray ? @ignore_paths : \@ignore_paths;
+}
+
