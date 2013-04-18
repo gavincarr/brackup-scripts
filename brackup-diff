@@ -64,10 +64,12 @@ File::DirCompare->compare($dir1, $dir2, sub {
   $a_rel =~ s!^$source_root/?!! if $a_rel;
 
   # Skip if path matches ignore patterns
-  for my $pattern (@{ $root->{ignore} }) {
-    if ($a_rel =~ /$pattern/ or (-d $a and "$a_rel/" =~ /$pattern/)) {
-      print "+ $a matches ignore pattern - skipping\n" if $verbose;
-      return;
+  if ($a_rel) {
+    for my $pattern (@{ $root->{ignore} }) {
+      if ($a_rel =~ /$pattern/ or (-d $a and "$a_rel/" =~ /$pattern/)) {
+        print "+ $a matches ignore pattern - skipping\n" if $verbose;
+        return;
+      }
     }
   }
 
