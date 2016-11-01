@@ -12,7 +12,7 @@ use Time::Piece;
 use IPC::Run;
 use File::Spec;
 use File::Path 2.0 qw(remove_tree);
-use YAML qw(LoadFile DumpFile);
+use YAML qw(LoadFile DumpFile Dump);
 use Carp;
 use Data::Dump qw(pp);
 
@@ -27,17 +27,18 @@ $|++;
 
 my $configfile = '/etc/brackup/brackup-restore-validate.conf';
 my $verbose = 0;
-my ($help, $noop, $list, $limit, $auto, $user, $ignore_count);
+my ($help, $noop, $list, $limit, $auto, $user, $ignore_count, @ignore_paths);
 usage unless GetOptions(
-  'help|h|?'        => \$help,
-  'verbose|v+'      => \$verbose,
-  'noop|n'          => \$noop,
-  'config|c=s'      => \$configfile,
-  'list|l'          => \$list,
-  'limit|L=i'       => \$limit,
-  'auto|a'          => \$auto,
-  'user|u=s'        => \$user,
-  'ignore|i=i'      => \$ignore_count,
+  'help|h|?'            => \$help,
+  'verbose|v+'          => \$verbose,
+  'noop|n'              => \$noop,
+  'config|c=s'          => \$configfile,
+  'list|l'              => \$list,
+  'limit|L=i'           => \$limit,
+  'auto|a'              => \$auto,
+  'user|u=s'            => \$user,
+  'ignore|i=i'          => \$ignore_count,
+  'ignore-path|ip=s@'   => \@ignore_paths,
 );
 usage if $help;
 usage if ! $list and @ARGV != 1;
@@ -114,7 +115,7 @@ chomp $brackup_file;
 print "+ brackup_file: $brackup_file\n" if $verbose;
 
 # Load ignore paths
-my @ignore_paths = get_ignore_paths(
+push @ignore_paths, get_ignore_paths(
   data_dir            => $data_dir,
   restore_file_dir    => $restore_file_dir,
   prefix              => $profile,
@@ -127,7 +128,7 @@ my @test_tree_entries = get_test_tree_entries(
   glob                => $test_tree_glob,
   limit               => $limit,
   target_size         => $target_size,
-  ignore              => \@ignore_paths,
+  ignore_paths        => \@ignore_paths,
 );
 print join("\n", map { sprintf "TEST_TREE=%-80s (%-5.1fM)", $_->[1], $_->[0]/1000 } @test_tree_entries) . "\n";
 
@@ -182,6 +183,7 @@ if ($auto) {
   };
   DumpFile("$restore_file_dir/$profile-$ts_dtm.yml", $results);
   print "\n** Results recorded to $restore_file_dir/$profile-$ts_dtm.yml **\n\n";
+  Dump($results);
 }
 
 # ---------------------------------------------------------------------------
@@ -195,10 +197,10 @@ sub get_test_tree_entries
     or croak "Missing required argument 'glob'";
   my $limit = delete $arg{limit};
   my $target_size = delete $arg{target_size};
-  my $ignore = delete $arg{ignore};
+  my $ignore_paths = delete $arg{ignore_paths};
   croak "Invalid argument(s): " . join(',', sort keys %arg) if %arg;
   croak "Can't set limit without target_size" if $limit && ! $target_size;
-  my %ignore = map { $_ => 1 } @$ignore if $ignore;
+  my %ignore_paths = map { $_ => 1 } @$ignore_paths if $ignore_paths;
   $target_size =~ s/_//g if $target_size;
 
   my $test_tree_output = qx(du -s $glob);
@@ -223,7 +225,7 @@ sub get_test_tree_entries
   }
 
   # Prune ignored entries
-  @entries = grep { ! $ignore{$_->[1]} } @entries if $ignore;
+  @entries = grep { ! $ignore_paths{$_->[1]} } @entries if $ignore_paths;
 
   # Prune down to limit, if applicable
   splice @entries, $limit if $limit;
