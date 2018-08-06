@@ -29,7 +29,7 @@ sub usage {
 
 my $verbose = 0;
 my ($help, $noop, $snapshot_size, $target);
-my ($run_dir, $global_snapshot, $global_monthly, $global_monthly_url);
+my ($run_dir, $global_snapshot, $global_monthly, $global_monthly_url, $save_stats);
 usage unless GetOptions(
   'help|h|?'            => \$verbose,
   'noop|n'              => \$noop,
@@ -55,6 +55,7 @@ if ($config) {
   $global_snapshot          = $config->{_}->{snapshot}    if ! defined $global_snapshot;
   $global_monthly           = $config->{_}->{monthly}     if ! defined $global_monthly;
   $global_monthly_url       = $config->{_}->{monthly_url} if ! defined $global_monthly_url;
+  $save_stats               = $config->{_}->{save_stats} || '';
 }
 $run_dir ||= '/root/brackup';
 chdir $run_dir or die "Cannot cd to $run_dir";
@@ -146,7 +147,7 @@ for my $source (@ARGV) {
 
   # Run brackup
   my $vflag = '-v ' x $verbose;
-  my $cmd = "/usr/bin/brackup --from=$source_variant --to=$target --save-stats $vflag";
+  my $cmd = "/usr/bin/brackup --from=$source_variant --to=$target --save-stats $save_stats $vflag";
   print STDERR "+ cmd: $cmd\n" if $verbose;
   unless ($noop) {
     system($cmd);
