@@ -1,7 +1,7 @@
 
 Summary: Brackup wrapper scripts, supporting snapshots and monthly backups
 Name: brackup-scripts
-Version: 0.4.5
+Version: 0.4.6
 Release: 1%{?org_tag}%{dist}
 Group: Applications/System
 License: Artistic
@@ -50,6 +50,9 @@ rm -rf %{buildroot}
 %attr(0755,apache,apache) %{_localstatedir}/www/brackup
 
 %changelog
+* Sun Mar 15 2020 Gavin Carr <gavin@openfusion.com.au> 0.4.6-1
+- Add optional pushdash-event invocation on completion.
+
 * Mon Aug 06 2018 Gavin Carr <gavin@openfusion.com.au> 0.4.5-1
 - Add run_dir to post_run invocation.
 

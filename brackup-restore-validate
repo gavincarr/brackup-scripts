@@ -66,6 +66,7 @@ my $brackup_file_dir = $config->{$profile}->{brackup_file_dir} || $config->{_}->
 my $restore_file_dir = $config->{$profile}->{restore_file_dir} || $config->{_}->{restore_file_dir};
 my $restore_output_dir = $config->{$profile}->{restore_output_dir} || $config->{_}->{restore_output_dir};
 my $target_size = $config->{$profile}->{target_size} || $config->{_}->{target_size};
+my $pushdash = $config->{$profile}->{pushdash} || $config->{_}->{pushdash};
 $ignore_count = $config->{$profile}->{no_repeat_count} if ! defined $ignore_count;
 $ignore_count = $config->{_}->{no_repeat_count}        if ! defined $ignore_count;
 $user ||= $config->{$profile}->{default_user} || $config->{_}->{default_user};
@@ -183,7 +184,11 @@ if ($auto) {
   };
   DumpFile("$restore_file_dir/$profile-$ts_dtm.yml", $results);
   print "\n** Results recorded to $restore_file_dir/$profile-$ts_dtm.yml **\n\n";
-  Dump($results);
+  print Dump($results);
+
+  if ($pushdash) {
+    qx(pushdash-event -n restore-validate --data-file $restore_file_dir/$profile-$ts_dtm.yml);
+  }
 }
 
 # ---------------------------------------------------------------------------
