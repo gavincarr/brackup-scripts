@@ -173,8 +173,8 @@ for my $source (@ARGV) {
 
 # Warn $post_run script, if set
 if ($post_run) {
-  printf STDERR "+ executing post_run: %s %s\n", $post_run, $rc if $verbose;
-  system("$post_run $rc");
+  printf STDERR "+ executing post_run: %s %s %s\n", $post_run, $rc, $run_dir if $verbose;
+  system("$post_run $rc $run_dir");
   die "post_run script '$post_run' returned non-zero exit code - aborting\n"
     if $? != 0;
 }
